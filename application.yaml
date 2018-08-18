@@ -1,0 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: linear-api
+  labels:
+    app: linear-api
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: linear-api
+        tier: frontend
+    spec:
+      containers:
+        - name: linear
+          image: gcr.io/tasks-cartman/linear-api
+          imagePullPolicy: Always
+          ports:
+            - name: http-server
+              containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials
+                  key: password
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command:
+            [
+              "/cloud_sql_proxy",
+              "-instances=tasks-cartman:us-east1:db=tcp:5432",
+              "-credential_file=/secrets/cloudsql/credentials.json",
+            ]
+          volumeMounts:
+            - name: cloudsql-instance-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: cloudsql-instance-credentials
+          secret:
+            secretName: cloudsql-instance-credentials
